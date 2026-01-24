@@ -109,6 +109,29 @@ Each row is a date + an index (`index` column).
 - **`divergence_state`**: categorical regime/divergence label (more granular than the boolean flag).
 - **`divergence_flag`** (True/False): True only for the specific divergence case **trend up + risk-off composite high + Nifty not down on the day**, and **not** a “bear-bounce” day.
 
+### Safe-haven (new) columns
+These are **per-asset mean-reversion stretch scores** for safe-haven assets (shared across indices each day):
+
+- **`safe_gold_score` / `safe_gold_label`**
+- **`safe_silver_score` / `safe_silver_label`**
+- **`safe_usdinr_score` / `safe_usdinr_label`**
+- **`safe_us10y_score` / `safe_us10y_label`**
+- **`safe_basket_score` / `safe_basket_label`** (average of enabled safe-haven scores)
+
+Interpretation:
+- These are **NOT “fair value”**; they indicate **overbought/oversold stretch vs the asset’s own history**.
+- Score scale: 0–20 `oversold`, 40–60 `neutral`, 80–100 `overbought`.
+
+How they’re computed (v1):
+- Inputs are **RSI** and **rolling z-scores** of **log(price)**:
+  - `RSI(rsi_period)` (default 14)
+  - `z(log(price), z_windows[0])` (default 60 trading days)
+  - `z(log(price), z_windows[1])` (default 1260 trading days \(\approx\) 5 years)
+- These components are normalized to \([-1, +1]\), combined using `safe_haven.weights` (default `[0.50, 0.30, 0.20]`), then mapped to 0–100.
+- If the long window isn’t available yet, the score uses the available components (so you don’t get a long run of NaNs early on).
+
+You can tune all of this under the `safe_haven:` section in `config.yaml`.
+
 ### Supporting columns (why the score is where it is)
 - **`trend_score`**: how strong the trend component is (0..60).
 - **`reversion_adj`**: overbought/oversold adjustment (-20..+20).

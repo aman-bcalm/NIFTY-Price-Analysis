@@ -10,7 +10,7 @@ from .data_loader import align_series, load_or_download_series
 from .features import cross_asset_features, equity_features
 from .indicators import forward_max_drawdown, forward_return
 from .regime_model import RiskModelConfig, walkforward_logistic_probabilities
-from .scoring import assemble_final_score, compute_score_components
+from .scoring import assemble_final_score, compute_safe_haven_stretch, compute_score_components
 from .util import ensure_dir
 
 
@@ -163,6 +163,51 @@ def main(argv: list[str] | None = None) -> int:
 
     out_dir = ensure_dir(args.out_dir)
     (out_dir / "aligned_prices.csv").write_text(aligned.to_csv(index=True), encoding="utf-8")
+
+    # --- Safe-haven per-asset scoring (shared, mean-reversion stretch) ---
+    safe_cfg = cfg.get("safe_haven", default={}) or {}
+    safe_enabled = bool(safe_cfg.get("enabled", True))
+    safe_assets = (safe_cfg.get("assets") or {}) if isinstance(safe_cfg.get("assets"), dict) else {}
+    safe_rsi = int(safe_cfg.get("rsi_period", 14))
+    zw = safe_cfg.get("z_windows", [60, 252])
+    safe_z_windows = (int(zw[0]), int(zw[1])) if isinstance(zw, list) and len(zw) >= 2 else (60, 252)
+    w = safe_cfg.get("weights", [0.50, 0.30, 0.20])
+    safe_weights = (float(w[0]), float(w[1]), float(w[2])) if isinstance(w, list) and len(w) >= 3 else (0.50, 0.30, 0.20)
+
+    safe_scores: dict[str, pd.Series] = {}
+    safe_labels: dict[str, pd.Series] = {}
+    if safe_enabled:
+        # Map config asset names -> aligned columns
+        mapping = {
+            "gold": "ro_gold",
+            "silver": "ro_silver",
+            "usdinr": "ro_usdinr",
+            "us10y": "y_us10y",
+        }
+        for asset_name, col in mapping.items():
+            if safe_assets.get(asset_name, True) and col in aligned.columns:
+                s = aligned[col].astype("float64")
+                scored = compute_safe_haven_stretch(
+                    s,
+                    rsi_period=safe_rsi,
+                    z_windows=safe_z_windows,
+                    weights=safe_weights,
+                )
+                safe_scores[f"safe_{asset_name}_score"] = scored["safe_score"]
+                safe_labels[f"safe_{asset_name}_label"] = scored["safe_label"]
+
+    safe_basket_enabled = bool(((safe_cfg.get("basket") or {}) if isinstance(safe_cfg.get("basket"), dict) else {}).get("enabled", True))
+    safe_basket_score = None
+    safe_basket_label = None
+    if safe_enabled and safe_basket_enabled and safe_scores:
+        tmp = pd.DataFrame(safe_scores)
+        safe_basket_score = tmp.mean(axis=1)
+        # Use same labeling function logic as safe_haven_score_to_label via compute_safe_haven_stretch labels:
+        # reuse the mapping by computing from score values.
+        safe_basket_label = safe_basket_score.apply(
+            lambda x: "insufficient_data" if pd.isna(x)
+            else ("oversold" if x < 20 else "weak" if x < 40 else "neutral" if x < 60 else "strong" if x < 80 else "overbought")
+        )
 
     # --- Feature config ---
     feat_cfg = cfg.get("features", default={}) or {}
@@ -331,6 +376,16 @@ def main(argv: list[str] | None = None) -> int:
             scored["divergence_flag"] = divergence_flag.reindex(scored.index).fillna(False)
         else:
             scored["divergence_flag"] = False
+
+        # Attach safe-haven columns (same for all indices).
+        if safe_enabled:
+            for k, s in safe_scores.items():
+                scored[k] = s.reindex(scored.index)
+            for k, s in safe_labels.items():
+                scored[k] = s.reindex(scored.index)
+            if safe_basket_score is not None and safe_basket_label is not None:
+                scored["safe_basket_score"] = safe_basket_score.reindex(scored.index)
+                scored["safe_basket_label"] = safe_basket_label.reindex(scored.index)
         scored = scored.assign(index=name)
 
         # Keep existing column order stable (Excel column letters) by pushing new diagnostics to the far right.

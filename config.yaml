@@ -49,3 +49,19 @@ scoring:
 output:
   write_features: false
 
+safe_haven:
+  enabled: true
+  # Per-asset enable flags (safe-haven mean-reversion stretch scoring)
+  assets:
+    gold: true
+    silver: true
+    usdinr: true
+    us10y: true
+  rsi_period: 14
+  # Short + long windows; long window is meant to reflect long-term history.
+  z_windows: [60, 1260]
+  # Weights for (RSI, z_short, z_long)
+  weights: [0.50, 0.30, 0.20]
+  basket:
+    enabled: true
+
