@@ -43,11 +43,23 @@ def equity_features(price: pd.Series, *, ema_fast: int, ema_slow: int, rsi: int,
     for w in vol_windows:
         out[f"vol{w}"] = realized_vol(px, window=w, annualize=True)
 
+    # --- Fast move / impulse features (sensitive to rapid selloffs and rebounds) ---
+    out["mom5"] = lr.rolling(5).sum()
+    out["mom20"] = lr.rolling(20).sum()
+    if "vol20" in out.columns:
+        daily_sigma = out["vol20"] / np.sqrt(252.0)
+        mom5_sigma = daily_sigma * np.sqrt(5.0)
+        out["mom5_vs_sigma"] = out["mom5"] / mom5_sigma.replace(0.0, np.nan)
+    else:
+        out["mom5_vs_sigma"] = np.nan
+
     # Standardized versions for scoring
     out["ema_slope_z"] = zscore(out["ema_slope"], window=z_window)
     out["ema_ratio_z"] = zscore(out["ema_ratio"], window=z_window)
     out["d200_z"] = zscore(out["d200"], window=z_window)
     out["dd_z"] = zscore(out["dd"], window=z_window)
+    out["mom20_z"] = zscore(out["mom20"], window=z_window)
+    out["mom5_vs_sigma_z"] = zscore(out["mom5_vs_sigma"], window=z_window)
 
     return out
 

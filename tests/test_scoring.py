@@ -15,6 +15,8 @@ def _equity_feat(n: int = 400) -> pd.DataFrame:
             "d200_z": rng.normal(size=n),
             "dd_z": rng.normal(size=n),
             "price_z": rng.normal(size=n),
+            "mom20_z": rng.normal(size=n),
+            "mom5_vs_sigma_z": rng.normal(size=n),
             "rsi": np.clip(50 + rng.normal(scale=10, size=n), 0, 100),
         },
         index=idx,
@@ -24,11 +26,12 @@ def _equity_feat(n: int = 400) -> pd.DataFrame:
 
 def test_score_bounds_and_labels():
     f = _equity_feat()
-    comps = compute_score_components(f, trend_score_max=60.0, reversion_adj_max=20.0)
+    comps = compute_score_components(f, trend_score_max=60.0, reversion_adj_max=20.0, impulse_adj_max=20.0)
     p = pd.Series(0.3, index=comps.index, name="risk_off_prob")
     out = assemble_final_score(
         components=comps,
         risk_off_prob=p,
+        riskoff_composite=None,
         risk_penalty_max=20.0,
         neutral_shift=20.0,
     )

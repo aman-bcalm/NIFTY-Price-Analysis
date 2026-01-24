@@ -43,6 +43,7 @@ scoring:
   trend_score_max: 60.0
   risk_penalty_max: 20.0
   reversion_adj_max: 20.0
+  impulse_adj_max: 20.0
   neutral_shift: 20.0
 
 output:

@@ -11,6 +11,17 @@ This is meant to be a **local decision-support tool** (not a broker / execution 
 
 **Version note:** this is **v1** of the model/logic and there is plenty of scope to improve and change thresholds, features, and model design as you iterate.
 
+## Strengths and limitations (v1)
+This v1 is **especially helpful for detecting stress, crash regimes, and potential bottoms**, because it is intentionally **sensitive to fast selloffs and fast rebounds** (impulse + stress + cross-asset confirmation).
+
+Why:
+- Fast downside moves create strong “impulse” + stress signals (and cross-asset risk-off confirmation) that the score reacts to quickly.
+- Market tops can be **slow and choppy**, with fewer clear stress signals until late, so the model may lag or stay neutral/bullish longer.
+
+Practical takeaway:
+- Use this tool primarily for **risk management, spotting stress, and spotting potential bottoms/bear-market-bounce conditions**.
+- For “top detection”, you’ll likely want additional modules later (breadth, valuation, sentiment, longer-horizon divergences, etc.).
+
 ## Setup
 
 Create a virtualenv, then install deps:
@@ -36,15 +47,20 @@ Outputs:
   - `features_model_X.csv` (the model input table used for `risk_off_prob`)
 
 ## How the score works (logic)
-Each index gets a **final 0–100 score** built from three parts:
+Each index gets a **final 0–100 score** built from these parts:
 
 - **TrendScore** (0..60): strength of the medium-term up/down trend (EMA slope/relationships) and stress (drawdown).
 - **ReversionAdjustment** (-20..+20): overbought/oversold adjustment from RSI and price extremes.
+- **ImpulseAdjustment** (-20..+20): reacts to **fast selloffs and fast buying** (short-horizon momentum vs volatility).
 - **RiskPenalty** (0..20): penalty from a learned “risk-off regime” probability.
 
 Final:
 
-- `score = clamp( trend_score + 20 + reversion_adj - risk_penalty, 0, 100 )`
+- `score = clamp( trend_score + neutral_shift + reversion_adj_eff + impulse_adj_eff - risk_penalty, 0, 100 )`
+
+Where:
+- `neutral_shift` defaults to **20**
+- `reversion_adj_eff` and `impulse_adj_eff` are the **effective** adjustments after applying a “risk context” damping factor during strong risk-off backdrops (to avoid treating every bounce as a healthy recovery).
 
 ### Labels (how to interpret score levels)
 The tool maps score into a human-readable bucket:

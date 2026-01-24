@@ -254,6 +254,7 @@ def main(argv: list[str] | None = None) -> int:
     trend_score_max = float(sc_cfg.get("trend_score_max", 60.0))
     risk_penalty_max = float(sc_cfg.get("risk_penalty_max", 20.0))
     reversion_adj_max = float(sc_cfg.get("reversion_adj_max", 20.0))
+    impulse_adj_max = float(sc_cfg.get("impulse_adj_max", 20.0))
     neutral_shift = float(sc_cfg.get("neutral_shift", 20.0))
 
     scores_long: list[pd.DataFrame] = []
@@ -312,10 +313,12 @@ def main(argv: list[str] | None = None) -> int:
             f,
             trend_score_max=trend_score_max,
             reversion_adj_max=reversion_adj_max,
+            impulse_adj_max=impulse_adj_max,
         )
         scored = assemble_final_score(
             components=comps,
             risk_off_prob=probs,
+            riskoff_composite=riskoff_comp if riskoff_comp is not None else None,
             risk_penalty_max=risk_penalty_max,
             neutral_shift=neutral_shift,
         )
@@ -329,6 +332,25 @@ def main(argv: list[str] | None = None) -> int:
         else:
             scored["divergence_flag"] = False
         scored = scored.assign(index=name)
+
+        # Keep existing column order stable (Excel column letters) by pushing new diagnostics to the far right.
+        base_cols = [
+            "trend_score",
+            "reversion_adj",
+            "rsi_unit",
+            "pricez_unit",
+            "trend_raw",
+            "risk_off_prob",
+            "risk_penalty",
+            "score",
+            "label",
+            "riskoff_composite",
+            "divergence_state",
+            "divergence_flag",
+            "index",
+        ]
+        extra_cols = [c for c in scored.columns if c not in base_cols]
+        scored = scored[base_cols + extra_cols]
         scores_long.append(scored.reset_index(names="date"))
 
     scores = pd.concat(scores_long, ignore_index=True).sort_values(["date", "index"])
