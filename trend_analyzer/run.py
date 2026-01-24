@@ -268,15 +268,23 @@ def main(argv: list[str] | None = None) -> int:
         lr1 = nifty_feat["lr"].reindex(riskoff_comp.index)
         daily_sigma = (nifty_feat["vol20"] / (252.0 ** 0.5)).reindex(riskoff_comp.index)
         equity_down = lr1 < 0
+        equity_up = lr1 > 0
         heavy_down = (lr1 < (-2.0 * daily_sigma)) | (lr1 < -0.02)
 
         riskoff_high = riskoff_comp > 0.75
         riskoff_low = riskoff_comp < -0.75
 
+        # Bear-market bounce detector:
+        # risk-off composite stays high, but equities bounce after a big down day.
+        lr_prev = lr1.shift(1)
+        sigma_prev = daily_sigma.shift(1)
+        prev_heavy_down = (lr_prev < (-2.0 * sigma_prev)) | (lr_prev < -0.02)
+
         # Categorical divergence state
         divergence_state = pd.Series("normal", index=riskoff_comp.index, dtype="object")
         divergence_state[riskoff_high & equity_down & heavy_down] = "riskoff_crash_day"
         divergence_state[riskoff_high & equity_down & (~heavy_down)] = "riskoff_selloff"
+        divergence_state[riskoff_high & equity_up & prev_heavy_down] = "riskoff_bear_bounce"
         divergence_state[riskoff_high & (~equity_down) & nifty_trend_up.reindex(riskoff_comp.index)] = "divergence_trendup_riskoff"
         divergence_state[riskoff_high & (~equity_down) & (~nifty_trend_up.reindex(riskoff_comp.index))] = "riskoff_downtrend"
         divergence_state[riskoff_low & heavy_down] = "selloff_without_riskoff"

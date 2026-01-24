@@ -137,6 +137,11 @@ These are designed to separate two different situations that can look similar if
   - Nifty is down on the day (even if the longer trend is still up)
   - Meaning: risk-off is showing up *in price already*.
 
+- **`riskoff_bear_bounce`**
+  - `riskoff_composite > 0.75`
+  - Nifty is **up on the day**, but the **previous day was a heavy down day**
+  - Meaning: this is often a **bear market bounce** / reflex rally while risk-off flows persist.
+
 - **`riskoff_crash_day`**
   - `riskoff_composite > 0.75`
   - Nifty is down very sharply (vol-adjusted or > ~2% log drop)
