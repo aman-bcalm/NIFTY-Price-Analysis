@@ -1,0 +1,50 @@
+data:
+  start: "2015-01-01"
+  end: null                  # null = today
+  cache_dir: "data/cache"
+  max_forward_fill_days: 3
+
+tickers:
+  equities:
+    # You can provide either a single ticker string or a list of fallback tickers.
+    nifty50: ["^NSEI"]
+    midcap100: ["^CRSMID", "NIFTY_MIDCAP_100.NS"]
+    # Yahoo doesn't reliably provide the Smallcap index series; use a liquid ETF proxy instead.
+    # You can reorder these to prefer your ETF of choice.
+    smallcap100: ["HDFCSML250.NS", "MOSMALL250.NS", "SMALL250.NS", "SMALLADD.NS"]
+  risk_off:
+    gold: "GC=F"
+    silver: "SI=F"
+    usdinr: "INR=X"
+    vix: "^VIX"
+  yields:
+    us10y: "^TNX"
+    us3m: "^IRX"              # may be missing; handled gracefully
+    # Dropping India bond yield requirement; keep US yields only.
+
+features:
+  ema_fast: 50
+  ema_slow: 200
+  rsi: 14
+  z_window: 252
+  price_z_window: 60
+  vol_windows: [20, 60]
+  dd_window: 252
+
+risk_model:
+  horizon_days: 21
+  fwd_return_threshold: -0.05
+  fwd_max_drawdown_threshold: -0.07
+  min_train_years: 5
+  retrain_frequency: "ME"     # monthly walk-forward retrain points (month-end)
+  regularization_C: 1.0
+
+scoring:
+  trend_score_max: 60.0
+  risk_penalty_max: 20.0
+  reversion_adj_max: 20.0
+  neutral_shift: 20.0
+
+output:
+  write_features: false
+
