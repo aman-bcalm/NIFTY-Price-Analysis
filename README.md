@@ -91,7 +91,7 @@ Each row is a date + an index (`index` column).
 - **`risk_off_prob`** (0..1): probability the environment looks like historical “risk-off” regimes.
 - **`riskoff_composite`**: a standardized composite of risk-off + divergence signals (higher = more risk-off signals firing together).
 - **`divergence_state`**: categorical regime/divergence label (more granular than the boolean flag).
-- **`divergence_flag`** (True/False): True only for the specific divergence case **trend up + risk-off composite high + Nifty not down on the day**.
+- **`divergence_flag`** (True/False): True only for the specific divergence case **trend up + risk-off composite high + Nifty not down on the day**, and **not** a “bear-bounce” day.
 
 ### Supporting columns (why the score is where it is)
 - **`trend_score`**: how strong the trend component is (0..60).
@@ -169,6 +169,7 @@ Use it as a **binary caution marker**.
 - **Bullish + confirmed**: high `score`, low `risk_off_prob`, `riskoff_composite` not rising, `divergence_state = normal`.
 - **Caution / late-cycle**: decent `score` but `divergence_flag = True` (hidden risk under trend) or steadily rising `riskoff_composite`.
 - **Risk-off selloff**: `divergence_state = riskoff_selloff` or `riskoff_crash_day` (treat as higher risk regardless of medium-term trend).
+- **Bear market bounce**: `divergence_state = riskoff_bear_bounce` (equities up after a heavy down day while risk-off flows persist).
 - **Bearish regime**: low `score` and elevated `risk_off_prob` (risk management matters most).
 
 ## Data window / how much history is downloaded

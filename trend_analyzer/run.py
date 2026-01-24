@@ -282,12 +282,24 @@ def main(argv: list[str] | None = None) -> int:
 
         # Categorical divergence state
         divergence_state = pd.Series("normal", index=riskoff_comp.index, dtype="object")
-        divergence_state[riskoff_high & equity_down & heavy_down] = "riskoff_crash_day"
-        divergence_state[riskoff_high & equity_down & (~heavy_down)] = "riskoff_selloff"
-        divergence_state[riskoff_high & equity_up & prev_heavy_down] = "riskoff_bear_bounce"
-        divergence_state[riskoff_high & (~equity_down) & nifty_trend_up.reindex(riskoff_comp.index)] = "divergence_trendup_riskoff"
-        divergence_state[riskoff_high & (~equity_down) & (~nifty_trend_up.reindex(riskoff_comp.index))] = "riskoff_downtrend"
-        divergence_state[riskoff_low & heavy_down] = "selloff_without_riskoff"
+        # Priority order (more specific first):
+        mask_crash_day = riskoff_high & equity_down & heavy_down
+        mask_selloff = riskoff_high & equity_down & (~heavy_down)
+        mask_bear_bounce = riskoff_high & equity_up & prev_heavy_down
+
+        trend_up = nifty_trend_up.reindex(riskoff_comp.index)
+        # True divergence = risk-off high while not down today, trend-up, and NOT just a bounce after a heavy down day.
+        mask_divergence = riskoff_high & (~equity_down) & trend_up & (~mask_bear_bounce)
+        mask_downtrend = riskoff_high & (~equity_down) & (~trend_up) & (~mask_bear_bounce)
+
+        mask_selloff_without_riskoff = riskoff_low & heavy_down
+
+        divergence_state[mask_crash_day] = "riskoff_crash_day"
+        divergence_state[mask_selloff] = "riskoff_selloff"
+        divergence_state[mask_bear_bounce] = "riskoff_bear_bounce"
+        divergence_state[mask_divergence] = "divergence_trendup_riskoff"
+        divergence_state[mask_downtrend] = "riskoff_downtrend"
+        divergence_state[mask_selloff_without_riskoff] = "selloff_without_riskoff"
 
         # Keep a boolean flag for the specific divergence case only:
         divergence_flag = divergence_state.eq("divergence_trendup_riskoff")
