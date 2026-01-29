@@ -83,18 +83,61 @@ def load_or_download_series(
         pass
     p = cache_path(cache_dir_p, ticker)
 
+    cached_s: pd.Series | None = None
+    cache_last_date: pd.Timestamp | None = None
+
+    # Load existing cache if available and not forcing refresh
     if p.exists() and not refresh:
         df = pd.read_csv(p, parse_dates=["Date"])
         df = df.set_index("Date").sort_index()
-        s = df["Close"].astype("float64")
-        return s
+        cached_s = df["Close"].astype("float64")
+        if not cached_s.empty:
+            cache_last_date = cached_s.index.max()
 
-    close = download_daily_adj_close([ticker], start=start, end=end)
-    s = close.iloc[:, 0].rename("Close")
-    out = s.to_frame()
+    # Determine what we need to fetch
+    # When end is None, explicitly use today's date (not None) to avoid timezone/interpretation issues
+    today = pd.Timestamp.today().normalize()
+    effective_end = end if end is not None else today.strftime("%Y-%m-%d")
+
+    fetch_start = start
+    fetch_end = effective_end
+
+    # If we have cache, only fetch incremental data beyond cache
+    if cached_s is not None and cache_last_date is not None:
+        end_ts = pd.to_datetime(effective_end).normalize()
+        cache_last_normalized = cache_last_date.normalize()
+
+        # If cache already covers or exceeds the requested end date, return cache
+        if cache_last_normalized >= end_ts:
+            return cached_s
+
+        # Fetch from day after cache last date up to effective_end
+        fetch_start = (cache_last_normalized + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+        fetch_end = effective_end
+
+    # Fetch new data (if needed)
+    try:
+        close = download_daily_adj_close([ticker], start=fetch_start, end=fetch_end)
+        new_s = close.iloc[:, 0].rename("Close")
+    except RuntimeError:
+        # No new data available (yfinance returned empty)
+        if cached_s is not None:
+            return cached_s
+        raise
+
+    # Merge cache + new data
+    if cached_s is not None:
+        # Combine: cache + new data, dropping duplicates (keep new if overlap)
+        combined = pd.concat([cached_s, new_s])
+        combined = combined[~combined.index.duplicated(keep="last")].sort_index()
+    else:
+        combined = new_s
+
+    # Save updated cache
+    out = combined.to_frame()
     out.index.name = "Date"
     out.to_csv(p, index=True)
-    return s
+    return combined
 
 
 def align_series(

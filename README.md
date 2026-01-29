@@ -34,12 +34,29 @@ python -m pip install -r requirements.txt
 
 ## Run
 
+### Daily run (recommended)
+For regular daily updates, activate the virtualenv and run:
+
 ```bash
-.venv\Scripts\python -m trend_analyzer.run --config config.yaml --out-dir outputs --refresh
+.venv\Scripts\Activate.ps1
+python -m trend_analyzer.run --config config.yaml --out-dir outputs
 ```
 
-Outputs:
-- `outputs/scores.csv` (daily scores + labels + risk-off + divergence fields)
+This will:
+- Use cached data from `data/cache/` (if available)
+- Fetch only new data beyond the cache (incremental)
+- Update cache files automatically
+- Regenerate `outputs/scores.csv` with latest scores
+
+### Force full refresh
+If you want to force a complete re-download of all data (ignoring cache):
+
+```bash
+python -m trend_analyzer.run --config config.yaml --out-dir outputs --refresh
+```
+
+### Outputs
+- `outputs/scores.csv` (daily scores + labels + risk-off + divergence fields + safe-haven columns)
 - `outputs/aligned_prices.csv` (aligned raw price series used to compute everything)
 - `outputs/features_*.csv` (optional; enable via `output.write_features: true` in `config.yaml`)
   - `features_<index>.csv` (per-index engineered features)
