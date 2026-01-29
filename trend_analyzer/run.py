@@ -220,6 +220,11 @@ def main(argv: list[str] | None = None) -> int:
     dd_window = int(feat_cfg.get("dd_window", 252))
 
     # --- Per-index equity features ---
+    # Trend score needs ema_slow (200) + slope_days (60) + z_window (252) valid rows.
+    # For indices with short history (e.g. midcap ETF from 2024), use a smaller z_window
+    # so we still get a valid trend_score.
+    # Midcap and Smallcap use the same reduced z_window (160) for consistency.
+    min_history_for_full_z = ema_slow + 60 + z_window  # 200 + 60 + 252 = 512
     eq_prices = {
         "nifty50": aligned.get("eq_nifty50"),
         "midcap100": aligned.get("eq_midcap100"),
@@ -229,6 +234,20 @@ def main(argv: list[str] | None = None) -> int:
     for k, s in eq_prices.items():
         if s is None:
             continue
+        valid_count = int(s.dropna().shape[0])
+        # Nifty uses full z_window; midcap and smallcap use reduced window (160) for consistency
+        if k == "nifty50":
+            if valid_count < min_history_for_full_z:
+                z_effective = min(z_window, max(60, valid_count - ema_slow - 60 - 1))
+            else:
+                z_effective = z_window
+        else:  # midcap100 and smallcap100
+            # Use same reduced window as midcap (160) for consistency
+            if valid_count < min_history_for_full_z:
+                z_effective = min(z_window, max(60, valid_count - ema_slow - 60 - 1))
+            else:
+                # Even if history is sufficient, use reduced window for midcap/smallcap
+                z_effective = 160
         eq_feats[k] = equity_features(
             s,
             ema_fast=ema_fast,
@@ -236,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
             rsi=rsi,
             dd_window=dd_window,
             vol_windows=vol_windows,
-            z_window=z_window,
+            z_window=z_effective,
             price_z_window=price_z_window,
         )
 

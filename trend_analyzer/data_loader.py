@@ -33,27 +33,47 @@ def download_daily_adj_close(
     start: str | None,
     end: str | None,
 ) -> pd.DataFrame:
-    df = yf.download(
-        tickers=list(tickers),
-        start=_parse_date(start),
-        end=_parse_date(end),
-        interval="1d",
-        auto_adjust=True,
-        group_by="column",
-        threads=True,
-        progress=False,
-    )
+    ticker_list = list(tickers)
+    if not ticker_list:
+        raise RuntimeError("No tickers provided.")
+    
+    try:
+        df = yf.download(
+            tickers=ticker_list,
+            start=_parse_date(start),
+            end=_parse_date(end),
+            interval="1d",
+            auto_adjust=True,
+            group_by="column",
+            threads=True,
+            progress=False,
+        )
+    except (TypeError, ValueError, KeyError) as e:
+        raise RuntimeError(f"yfinance download failed for {ticker_list}: {e}") from e
+    
     if df is None or df.empty:
         raise RuntimeError("No data returned from data source.")
 
     # yfinance returns either:
     # - columns: [Open, High, Low, Close, Volume] for single ticker
     # - MultiIndex columns: (field, ticker) for multiple
-    if isinstance(df.columns, pd.MultiIndex):
-        close = df["Close"].copy()
-    else:
-        close = df[["Close"]].copy()
-        close.columns = [tickers.__iter__().__next__()]  # best-effort
+    try:
+        if isinstance(df.columns, pd.MultiIndex):
+            if "Close" not in df.columns.get_level_values(0):
+                raise RuntimeError("No 'Close' column found in downloaded data.")
+            close = df["Close"].copy()
+        else:
+            if "Close" not in df.columns:
+                raise RuntimeError("No 'Close' column found in downloaded data.")
+            close = df[["Close"]].copy()
+            ticker_list = list(tickers)
+            if ticker_list:
+                close.columns = [ticker_list[0]]  # Use first ticker as column name
+    except (KeyError, IndexError) as e:
+        raise RuntimeError(f"Failed to extract Close prices from downloaded data: {e}") from e
+
+    if close is None or close.empty:
+        raise RuntimeError("Close prices DataFrame is empty after extraction.")
 
     close.index = pd.to_datetime(close.index).tz_localize(None)
     close = close.sort_index()
@@ -118,6 +138,8 @@ def load_or_download_series(
     # Fetch new data (if needed)
     try:
         close = download_daily_adj_close([ticker], start=fetch_start, end=fetch_end)
+        if close is None or close.empty or close.shape[1] == 0:
+            raise RuntimeError("Downloaded data is empty or has no columns.")
         new_s = close.iloc[:, 0].rename("Close")
     except RuntimeError:
         # No new data available (yfinance returned empty)

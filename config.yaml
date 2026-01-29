@@ -8,7 +8,8 @@ tickers:
   equities:
     # You can provide either a single ticker string or a list of fallback tickers.
     nifty50: ["^NSEI"]
-    midcap100: ["^CRSMID", "NIFTY_MIDCAP_100.NS"]
+    # Nifty Midcap 150 ETFs (Yahoo tickers); order prefers lower expense ratio.
+    midcap100: ["MIDCAPETF.NS", "MID150BEES.NS", "MIDCAPIETF.NS", "HDFCMID150.NS", "MID150CASE.NS"]
     # Yahoo doesn't reliably provide the Smallcap index series; use a liquid ETF proxy instead.
     # You can reorder these to prefer your ETF of choice.
     smallcap100: ["HDFCSML250.NS", "MOSMALL250.NS", "SMALL250.NS", "SMALLADD.NS"]
